@@ -1,0 +1,1 @@
+state,district,geoid,total_votes,party,votes,percentage
