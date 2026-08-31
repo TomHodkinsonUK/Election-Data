@@ -1,4 +1,4 @@
-state,county,geoid,total votes,party,votes,percentage
+state,county,geoid,total_votes,party,votes,percentage
 CT,FAIRFIELD,G0900010,364366,Democratic,124978,34.30012679558466
 CT,FAIRFIELD,G0900010,364366,Republican,233194,63.999934132163816
 CT,FAIRFIELD,G0900010,364366,Other,6194,1.6999390722515273
