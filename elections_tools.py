@@ -43,7 +43,7 @@ def create_csv(data, filename, classification):
 
         # Richmond-compatible JSON uses "counties"
         # even when the records represent congressional districts.
-        region_list = data.get('coutnies', [])
+        region_list = data.get('counties', [])
 
         for region in region_list:
             state = region.get('a')
