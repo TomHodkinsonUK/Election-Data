@@ -27,7 +27,7 @@ def main():
   if choice == '1':
     year = int(input('Election Year: '))
     state = input('State (leave blank for all states): ')
-    result = highest_vote_share(elections, year, party)
+    result = highest_vote_share(elections, year, party, state)
     print(result)
   
   elif choice == '2':
