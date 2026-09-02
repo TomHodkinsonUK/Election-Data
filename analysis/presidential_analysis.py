@@ -27,17 +27,15 @@ def main():
 
   if choice == '1':
     year = int(input('Election Year: '))
+    state = input('State (leave blank for all states): ')
     result = highest_vote_share(elections, year, party)
     print(result)
+  
   elif choice == '2':
-    year = int(input('Election Year: '))
-    result = highest_southern(elections, year, party)
-    print(result)
-  elif choice == '3':
     year_1 = int(input('First Election Year: '))
     year_2 = int(input('Second Election Year: '))
     state = input('State (leave blank for all states): ')
-    result = largest_vote_gain(elections, year_1, year_2, party, state)
+    result = largest_vote_share_gain(elections, year_1, year_2, party, state)
     print(result[['state_year_1',
                   'county_year_1',
                   'percentage_year_1',
@@ -52,9 +50,12 @@ def main():
 
     
 
-def highest_vote_share(elections, year, party):
+def highest_vote_share(elections, year, party, state=None):
 
   data = elections[year]
+
+  if state: 
+    data = data[data['state'] == state]
 
   party_data = data[data['party'] == party]
 
@@ -65,17 +66,8 @@ def highest_vote_share(elections, year, party):
 
   return result.head(20) 
 
-def highest_southern(elections, year, party):
-  data = elections[year]
 
-  southern_data = data[data['state'].isin(southern_states)]
-  party_data = southern_data[southern_data['party'] == party]
-
-  result = party_data.sort_values('percentage', ascending=False)
-
-  return result.head(20)
-
-def largest_vote_gain(elections, year_1, year_2, party, state=None):
+def largest_vote_share_gain(elections, year_1, year_2, party, state=None):
   data_1 = elections[year_1]
   data_2 = elections[year_2]
 
