@@ -1,4 +1,4 @@
-import pandas as pd 
+import pandas as pd #type: ignore
 
 southern_states = [
   'AL', 'AR', 'FL', 'GA', 'LA', 
@@ -15,20 +15,42 @@ def main():
     1972: pd.read_csv('data/presidential/csv/1972.csv')
   }
 
-  for year, data in elections.items():
-    print(f'{year}: {len(data)} rows')
+  print('1. Highest vote share')
+  print('2. Highest Southern vote share')
+  print('3. Largest vote-share gain')
 
 
-  year = int(input('Election Year: '))
+  choice = input('Choose an analysis: ')
+
   party = input('Party: ')
 
-  if year not in elections: 
-    print('Election year not available.')
-    return 
-  
-  result = highest_vote_share(elections, year, party)
 
-  print(result)
+  if choice == '1':
+    year = int(input('Election Year: '))
+    result = highest_vote_share(elections, year, party)
+    print(result)
+  elif choice == '2':
+    year = int(input('Election Year: '))
+    result = highest_southern(elections, year, party)
+    print(result)
+  elif choice == '3':
+    year_1 = int(input('First Election Year: '))
+    year_2 = int(input('Second Election Year: '))
+    state = input('State (leave blank for all states): ')
+    result = largest_vote_gain(elections, year_1, year_2, party, state)
+    print(result[['state_year_1',
+                  'county_year_1',
+                  'percentage_year_1',
+                  'percentage_year_2',
+                  'vote_share_change']])
+
+
+  else:
+    print('Invalid choice.')
+    
+
+
+    
 
 def highest_vote_share(elections, year, party):
 
@@ -46,14 +68,43 @@ def highest_vote_share(elections, year, party):
 def highest_southern(elections, year, party):
   data = elections[year]
 
-  southern_data = data[data['state']isin(southern_states)]
+  southern_data = data[data['state'].isin(southern_states)]
   party_data = southern_data[southern_data['party'] == party]
 
   result = party_data.sort_values('percentage', ascending=False)
 
   return result.head(20)
-  
 
+def largest_vote_gain(elections, year_1, year_2, party, state=None):
+  data_1 = elections[year_1]
+  data_2 = elections[year_2]
+
+  if state:
+    data_1 = data_1[data_1['state'] == state]
+    data_2 = data_2[data_2['state'] == state]
+
+  party_1 = data_1[data_1['party'] == party]
+  party_2 = data_2[data_2['party'] == party]
+
+  merged = party_1.merge(
+    party_2, 
+    on='geoid', 
+    suffixes=('_year_1', '_year_2')
+  )
   
+  merged['vote_share_change'] = (
+    merged['percentage_year_2'] - 
+    merged['percentage_year_1']
+  )
+
+  result = merged.sort_values(
+    'vote_share_change',
+    ascending=False
+  )
+
+
+  return result.head(20)
+
+
 if __name__ == '__main__':
   main()
