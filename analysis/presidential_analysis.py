@@ -16,8 +16,7 @@ def main():
   }
 
   print('1. Highest vote share')
-  print('2. Highest Southern vote share')
-  print('3. Largest vote-share gain')
+  print('2. Largest vote-share gain')
 
 
   choice = input('Choose an analysis: ')
