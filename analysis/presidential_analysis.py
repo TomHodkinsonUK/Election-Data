@@ -2,6 +2,7 @@ import pandas as pd #type: ignore
 import plotly.express as px 
 import plotly.graph_objects as go
 import requests
+import json 
  
 
 southern_states = [
@@ -190,7 +191,7 @@ def county_map(data, year):
         data['geoid'].str[4:7]
     )
 
-    # Find the winning party in each county
+    # Find the winning party in each county/district
     winners = data.loc[
         data.groupby('geoid')['votes'].idxmax()
     ].copy()
@@ -200,6 +201,32 @@ def county_map(data, year):
         winners['percentage'],
         errors='coerce'
     )
+
+    # --------------------------------------------------
+    # ALASKA DISTRICT MAPPING
+    # --------------------------------------------------
+
+    alaska_mapping = {
+        'G0203010': 'Prince of Wales',
+        'G0203030': 'Ketchikan',
+        'G0203050': 'Wrangell-Petersburg',
+        'G0203070': 'Sitka',
+        'G0203090': 'Juneau',
+        'G0203110': 'Lynn Canal-I.S.',
+        'G0203130': 'Cordova-McCarthy',
+        'G0203150': 'Valdez-C.-W.',
+        'G0203170': 'Palmer-W.-T.',
+        'G0203190': 'Anchorage',
+        'G0203210': 'Seward',
+        'G0203230': 'Kenai-Cook Inlet',
+        'G0203250': 'Kodiak',
+        'G0203270': 'Aleutian Islands',
+        'G0203290': 'Bristol Bay',
+        'G0203310': 'Bethel',
+        'G0203330': 'Kuskokwim',
+        'G0203350': 'Yukon-Koyukuk',
+        'G0203370': 'Fairbanks'
+    }
 
     # --------------------------------------------------
     # LOAD HISTORICAL GEOJSON
@@ -212,30 +239,45 @@ def county_map(data, year):
         geojson = json.load(file)
 
     # --------------------------------------------------
-    # MATCH GEOJSON TO RICHMOND DATA
+    # MATCH RICHMOND DATA TO HISTORICAL GEOJSON
     # --------------------------------------------------
 
-    # Get the FIPS codes contained in the historical
-    # GeoJSON
+    # Normal counties are matched using FIPS.
+    #
+    # Alaska is different because Richmond uses
+    # election-district GEOIDs while Newberry uses
+    # historical district names.
+
     geojson_fips = {
-        feature['properties']['fips']
+        feature['properties'].get('fips')
         for feature in geojson['features']
     }
 
-    # Keep only Richmond counties that have a
-    # corresponding historical boundary
-    winners = winners[
+    geojson_names = {
+        feature['properties'].get('NAME')
+        for feature in geojson['features']
+    }
+
+    # Standard counties
+    standard_winners = winners[
         winners['fips'].isin(geojson_fips)
     ].copy()
 
-    print("\nNumber of winning counties:", len(winners))
-    print("Unique FIPS:", winners['fips'].nunique())
+    # Alaska districts
+    alaska_winners = winners[
+        winners['geoid'].isin(alaska_mapping)
+    ].copy()
 
-    print("\nWinning parties:")
-    print(winners['party'].value_counts())
+    alaska_winners['historical_name'] = (
+        alaska_winners['geoid'].map(alaska_mapping)
+    )
+
+    alaska_winners = alaska_winners[
+        alaska_winners['historical_name'].isin(geojson_names)
+    ].copy()
 
     # --------------------------------------------------
-    # PARTY COLOUR SCALES
+    # CREATE COLOUR SCALES
     # --------------------------------------------------
 
     colour_scales = {
@@ -288,49 +330,144 @@ def county_map(data, year):
 
     for party in parties:
 
-        # Select counties won by this party
-        subset = winners[
-            winners['party'] == party
+        # --------------------------------------------------
+        # STANDARD COUNTIES
+        # --------------------------------------------------
+
+        subset = standard_winners[
+            standard_winners['party'] == party
         ].copy()
 
-        if subset.empty:
-            continue
+        if not subset.empty:
 
-        # Add this party's counties
-        fig.add_trace(
-            go.Choropleth(
-                geojson=geojson,
+            fig.add_trace(
+                go.Choropleth(
+                    geojson=geojson,
 
-                locations=subset['fips'],
+                    locations=subset['fips'],
 
-                featureidkey='properties.fips',
+                    featureidkey='properties.fips',
 
-                z=subset['percentage'],
+                    z=subset['percentage'],
 
-                zmin=0,
-                zmax=100,
+                    zmin=0,
+                    zmax=100,
 
-                colorscale=colour_scales[party],
+                    colorscale=colour_scales[party],
 
-                showscale=False,
+                    showscale=False,
 
-                marker_line_width=0.2,
-                marker_line_color='white',
+                    marker_line_width=0.2,
+                    marker_line_color='white',
 
-                name=party,
+                    name=party,
 
-                customdata=subset[
-                    ['county', 'state', 'party', 'votes']
-                ],
+                    customdata=subset[
+                        ['county', 'state', 'party', 'votes']
+                    ],
 
-                hovertemplate=(
-                    '<b>%{customdata[0]}</b><br>'
-                    'State: %{customdata[1]}<br>'
-                    'Winner: %{customdata[2]}<br>'
-                    'Votes: %{customdata[3]:,}<br>'
-                    'Vote share: %{z:.2f}%'
-                    '<extra></extra>'
+                    hovertemplate=(
+                        '<b>%{customdata[0]}</b><br>'
+                        'State: %{customdata[1]}<br>'
+                        'Winner: %{customdata[2]}<br>'
+                        'Votes: %{customdata[3]:,}<br>'
+                        'Vote share: %{z:.2f}%'
+                        '<extra></extra>'
+                    )
                 )
+            )
+
+        # --------------------------------------------------
+        # ALASKA
+        # --------------------------------------------------
+
+        alaska_subset = alaska_winners[
+            alaska_winners['party'] == party
+        ].copy()
+
+        if not alaska_subset.empty:
+
+            # Get the actual Newberry names
+            alaska_locations = (
+                alaska_subset['historical_name']
+            )
+
+            # Create a temporary GeoJSON containing
+            # only the Alaska features for this party.
+            alaska_geojson = {
+                'type': 'FeatureCollection',
+                'features': [
+                    feature
+                    for feature in geojson['features']
+                    if feature['properties'].get('NAME')
+                    in alaska_locations.tolist()
+                ]
+            }
+
+            fig.add_trace(
+                go.Choropleth(
+                    geojson=alaska_geojson,
+
+                    locations=alaska_subset[
+                        'historical_name'
+                    ],
+
+                    featureidkey='properties.NAME',
+
+                    z=alaska_subset['percentage'],
+
+                    zmin=0,
+                    zmax=100,
+
+                    colorscale=colour_scales[party],
+
+                    showscale=False,
+
+                    marker_line_width=0.2,
+                    marker_line_color='white',
+
+                    name=party,
+
+                    showlegend=False,
+
+                    customdata=alaska_subset[
+                        ['county', 'state', 'party', 'votes']
+                    ],
+
+                    hovertemplate=(
+                        '<b>%{customdata[0]}</b><br>'
+                        'State: %{customdata[1]}<br>'
+                        'Winner: %{customdata[2]}<br>'
+                        'Votes: %{customdata[3]:,}<br>'
+                        'Vote share: %{z:.2f}%'
+                        '<extra></extra>'
+                    )
+                )
+            )
+
+    # --------------------------------------------------
+    # PARTY LEGEND
+    # --------------------------------------------------
+
+    # Dummy traces create the legend entries.
+    # The actual map traces have the same names.
+
+    for party, symbol in [
+        ('Republican', '●'),
+        ('Democratic', '●'),
+        ('American Independent', '●'),
+        ('Other', '●')
+    ]:
+
+        fig.add_trace(
+            go.Scattergeo(
+                lon=[None],
+                lat=[None],
+                mode='markers',
+                marker=dict(size=10),
+                name=party,
+                showlegend=True,
+                hoverinfo='skip'
             )
         )
 
@@ -344,6 +481,7 @@ def county_map(data, year):
     )
 
     fig.update_layout(
+
         title=f'Presidential election, {year}',
 
         margin={
@@ -353,7 +491,12 @@ def county_map(data, year):
             'b': 0
         },
 
-        legend_title_text='Winning party'
+        legend=dict(
+            title='Winning party',
+            orientation='v',
+            x=0.01,
+            y=0.99
+        )
     )
 
     return fig
