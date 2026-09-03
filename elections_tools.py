@@ -1,25 +1,59 @@
 import csv
+import pandas as pd 
 import requests #type: ignore
 
 # MAIN PROGRAM
 def main():
-    choice = input("Would you like to (1) create a CSV or (2) compare elections? ")
+
+    choice = input(
+        "Would you like to (1) create a CSV, "
+        "(2) compare elections, or "
+        "(3) apply corrections? "
+    )
 
     if choice == "1":
-        classification = input("Select classification (counties/districts): ").strip().lower()
+
+        classification = input(
+            "Select classification (counties/districts): "
+        ).strip().lower()
+
         url = input("URL: ")
         data = download_data(url)
+
         filename = input("Filename: ")
-        create_csv(data, filename, classification)
+
+        create_csv(
+            data,
+            filename,
+            classification
+        )
 
     elif choice == "2":
-        classification = input("Select classification (counties/districts): ").strip().lower()
+
+        classification = input(
+            "Select classification (counties/districts): "
+        ).strip().lower()
+
         first_file = input("First CSV file: ")
         second_file = input("Second CSV file: ")
+
         year_1 = int(input("First election year: "))
         year_2 = int(input("Second election year: "))
+
         filename = input("Comparison CSV filename: ")
-        compare_data(first_file, second_file, filename, year_1, year_2, classification)
+
+        compare_data(
+            first_file,
+            second_file,
+            filename,
+            year_1,
+            year_2,
+            classification
+        )
+
+    else:
+
+        print("Invalid choice.")
 
 def download_data(url):
     response = requests.get(url)
@@ -66,6 +100,7 @@ def create_csv(data, filename, classification):
                     votes,
                     percentage
                 ])
+
 def compare_data(first_file, second_file, filename, year_1, year_2, classification):
     region_label = "county" if classification == "counties" else "district"
 
