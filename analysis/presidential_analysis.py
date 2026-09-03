@@ -17,20 +17,22 @@ def main():
 
   print('1. Highest vote share')
   print('2. Largest vote-share gain')
-
+  print('3. County electoral trajectory')
 
   choice = input('Choose an analysis: ')
 
-  party = input('Party: ')
+  
 
 
   if choice == '1':
+    party = input('Party: ')
     year = int(input('Election Year: '))
     state = input('State (leave blank for all states): ')
     result = highest_vote_share(elections, year, party, state)
     print(result)
   
   elif choice == '2':
+    party = input('Party: ')
     year_1 = int(input('First Election Year: '))
     year_2 = int(input('Second Election Year: '))
     state = input('State (leave blank for all states): ')
@@ -40,6 +42,24 @@ def main():
                   'percentage_year_1',
                   'percentage_year_2',
                   'vote_share_change']])
+
+  elif choice == '3':
+    state = input('State: ').upper()
+    county = input('County: ').upper()
+    
+
+    result = county_trajectory(
+      elections, 
+      state,
+      county, 
+    )
+
+    print(result[['party',
+                  'percentage_1960',
+                  'percentage_1964',
+                  'percentage_1968',
+                  'percentage_1972']].to_string(index=False))
+
 
 
   else:
@@ -95,6 +115,59 @@ def largest_vote_share_gain(elections, year_1, year_2, party, state=None):
 
 
   return result.head(20)
+
+
+def county_trajectory(elections, state, county):
+
+  data_1960 = elections[1960]
+  data_1964 = elections[1964]
+  data_1968 = elections[1968]
+  data_1972 = elections[1972]
+
+  county_1960 = data_1960[
+    (data_1960['state'] == state) &
+    (data_1960['county'] == county)
+  ]
+
+  county_1964 = data_1964[
+    (data_1964['state'] == state) &
+    (data_1964['county'] == county)
+  ]
+
+  county_1968 = data_1968[
+    (data_1968['state'] == state) &
+    (data_1968['county'] == county)
+  ]
+
+  county_1972 = data_1972[
+    (data_1972['state'] == state) &
+    (data_1972['county'] == county)
+  ]
+
+  merged = county_1960.merge(
+    county_1964,
+    on='party',
+    suffixes=('_1960', '_1964')
+  )
+
+  merged = merged.merge(
+    county_1968,
+    on='party',
+    how='outer'
+  )
+
+  merged = merged.merge(
+    county_1972,
+    on='party',
+    how='outer'
+  )
+
+  merged = merged.rename(columns={
+    'percentage_x': 'percentage_1968',
+    'percentage_y': 'percentage_1972'
+  })
+  
+  return merged 
 
 
 if __name__ == '__main__':
