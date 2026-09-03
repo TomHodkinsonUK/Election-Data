@@ -1,4 +1,7 @@
 import pandas as pd #type: ignore
+import plotly.express as px 
+import plotly.graph_objects as go
+import requests
 
 southern_states = [
   'AL', 'AR', 'FL', 'GA', 'LA', 
@@ -18,6 +21,7 @@ def main():
   print('1. Highest vote share')
   print('2. Largest vote-share gain')
   print('3. County electoral trajectory')
+  print('4. County map')
 
   choice = input('Choose an analysis: ')
 
@@ -60,15 +64,19 @@ def main():
                   'percentage_1968',
                   'percentage_1972']].to_string(index=False))
 
+  elif choice == '4':
+    year = int(input('Election Year: '))
+    data = elections[year]
+    result = county_map(
+        data,
+        year
+    )
 
+    result.show()
 
   else:
     print('Invalid choice.')
     
-
-
-    
-
 def highest_vote_share(elections, year, party, state=None):
 
   data = elections[year]
@@ -84,7 +92,6 @@ def highest_vote_share(elections, year, party, state=None):
   )
 
   return result.head(20) 
-
 
 def largest_vote_share_gain(elections, year_1, year_2, party, state=None):
   data_1 = elections[year_1]
@@ -115,7 +122,6 @@ def largest_vote_share_gain(elections, year_1, year_2, party, state=None):
 
 
   return result.head(20)
-
 
 def county_trajectory(elections, state, county):
 
@@ -169,6 +175,251 @@ def county_trajectory(elections, state, county):
   
   return merged 
 
+def county_map(data, year):
+
+    data = data.copy()
+
+    # Convert Richmond GEOID to standard 5-digit FIPS
+    data['fips'] = (
+        data['geoid'].str[1:3] +
+        data['geoid'].str[4:7]
+    )
+
+    # Find the winning party in each county
+    winners = data.loc[
+        data.groupby('fips')['votes'].idxmax()
+    ].copy()
+
+    # Make sure percentage is numeric
+    winners['percentage'] = pd.to_numeric(
+        winners['percentage'],
+        errors='coerce'
+    )
+
+    # Download county GeoJSON
+    geojson = requests.get(
+        'https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json'
+    ).json()
+
+    # Get FIPS codes available in the GeoJSON
+    geojson_fips = {
+        feature['id']
+        for feature in geojson['features']
+    }
+
+    # Remove historical/non-standard geographic units
+    # which do not have matching modern county boundaries
+    winners = winners[
+        winners['fips'].isin(geojson_fips)
+    ].copy()
+
+    print("Number of counties:", len(winners))
+    print("Unique FIPS:", winners['fips'].nunique())
+
+    print("\nWinning parties:")
+    print(winners['party'].value_counts())
+
+    # Separate the winners by party
+    republican = winners[
+        winners['party'] == 'Republican'
+    ]
+
+    democratic = winners[
+        winners['party'] == 'Democratic'
+    ]
+
+    independent = winners[
+        winners['party'] == 'American Independent'
+    ]
+
+    other = winners[
+        ~winners['party'].isin([
+            'Republican',
+            'Democratic',
+            'American Independent'
+        ])
+    ]
+
+    # Create the map
+    fig = go.Figure()
+
+    # --------------------------------------------------
+    # REPUBLICAN
+    # --------------------------------------------------
+
+    if not republican.empty:
+
+        fig.add_trace(
+            go.Choropleth(
+                geojson=geojson,
+                locations=republican['fips'],
+                featureidkey='id',
+                z=republican['percentage'],
+                zmin=50,
+                zmax=100,
+                colorscale=[
+                    [0, 'rgb(255,235,235)'],
+                    [0.25, 'rgb(255,190,190)'],
+                    [0.5, 'rgb(240,120,120)'],
+                    [0.75, 'rgb(200,50,50)'],
+                    [1, 'rgb(120,0,0)']
+                ],
+                showscale=False,
+                marker_line_width=0.2,
+                marker_line_color='white',
+                name='Republican',
+                customdata=republican[
+                    ['county', 'state', 'party', 'votes']
+                ],
+                hovertemplate=(
+                    '<b>%{customdata[0]}</b><br>'
+                    'State: %{customdata[1]}<br>'
+                    'Winner: %{customdata[2]}<br>'
+                    'Votes: %{customdata[3]:,}<br>'
+                    'Vote share: %{z:.2f}%'
+                    '<extra></extra>'
+                )
+            )
+        )
+
+    # --------------------------------------------------
+    # DEMOCRATIC
+    # --------------------------------------------------
+
+    if not democratic.empty:
+
+        fig.add_trace(
+            go.Choropleth(
+                geojson=geojson,
+                locations=democratic['fips'],
+                featureidkey='id',
+                z=democratic['percentage'],
+                zmin=50,
+                zmax=100,
+                colorscale=[
+                    [0, 'rgb(235,240,255)'],
+                    [0.25, 'rgb(190,210,255)'],
+                    [0.5, 'rgb(120,160,240)'],
+                    [0.75, 'rgb(50,100,200)'],
+                    [1, 'rgb(0,40,130)']
+                ],
+                showscale=False,
+                marker_line_width=0.2,
+                marker_line_color='white',
+                name='Democratic',
+                customdata=democratic[
+                    ['county', 'state', 'party', 'votes']
+                ],
+                hovertemplate=(
+                    '<b>%{customdata[0]}</b><br>'
+                    'State: %{customdata[1]}<br>'
+                    'Winner: %{customdata[2]}<br>'
+                    'Votes: %{customdata[3]:,}<br>'
+                    'Vote share: %{z:.2f}%'
+                    '<extra></extra>'
+                )
+            )
+        )
+
+    # --------------------------------------------------
+    # AMERICAN INDEPENDENT
+    # --------------------------------------------------
+
+    if not independent.empty:
+
+        fig.add_trace(
+            go.Choropleth(
+                geojson=geojson,
+                locations=independent['fips'],
+                featureidkey='id',
+                z=independent['percentage'],
+                zmin=50,
+                zmax=100,
+                colorscale=[
+                    [0, 'rgb(255,245,220)'],
+                    [0.25, 'rgb(255,220,150)'],
+                    [0.5, 'rgb(245,180,70)'],
+                    [0.75, 'rgb(210,130,20)'],
+                    [1, 'rgb(160,80,0)']
+                ],
+                showscale=False,
+                marker_line_width=0.2,
+                marker_line_color='white',
+                name='American Independent',
+                customdata=independent[
+                    ['county', 'state', 'party', 'votes']
+                ],
+                hovertemplate=(
+                    '<b>%{customdata[0]}</b><br>'
+                    'State: %{customdata[1]}<br>'
+                    'Winner: %{customdata[2]}<br>'
+                    'Votes: %{customdata[3]:,}<br>'
+                    'Vote share: %{z:.2f}%'
+                    '<extra></extra>'
+                )
+            )
+        )
+
+    # --------------------------------------------------
+    # OTHER
+    # --------------------------------------------------
+
+    if not other.empty:
+
+        fig.add_trace(
+            go.Choropleth(
+                geojson=geojson,
+                locations=other['fips'],
+                featureidkey='id',
+                z=other['percentage'],
+                zmin=50,
+                zmax=100,
+                colorscale=[
+                    [0, 'rgb(235,255,235)'],
+                    [0.25, 'rgb(190,240,190)'],
+                    [0.5, 'rgb(120,210,120)'],
+                    [0.75, 'rgb(50,170,50)'],
+                    [1, 'rgb(0,110,0)']
+                ],
+                showscale=False,
+                marker_line_width=0.2,
+                marker_line_color='white',
+                name='Other',
+                customdata=other[
+                    ['county', 'state', 'party', 'votes']
+                ],
+                hovertemplate=(
+                    '<b>%{customdata[0]}</b><br>'
+                    'State: %{customdata[1]}<br>'
+                    'Winner: %{customdata[2]}<br>'
+                    'Votes: %{customdata[3]:,}<br>'
+                    'Vote share: %{z:.2f}%'
+                    '<extra></extra>'
+                )
+            )
+        )
+
+    # --------------------------------------------------
+    # MAP SETTINGS
+    # --------------------------------------------------
+
+    fig.update_geos(
+        visible=False,
+        projection_type='albers usa'
+    )
+
+    fig.update_layout(
+        title=f'Presidential election, {year}',
+        margin={
+            'r': 0,
+            't': 50,
+            'l': 0,
+            'b': 0
+        },
+        legend_title_text='Winning party'
+    )
+
+    return fig
 
 if __name__ == '__main__':
   main()
