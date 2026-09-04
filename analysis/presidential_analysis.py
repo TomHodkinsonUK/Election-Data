@@ -267,6 +267,18 @@ def county_map(data, year):
 
         geojson = json.load(file)
 
+    # Add the missing 1972 Alaska election-district polygons
+    if year == 1972:
+
+        with open(
+            'data/geography/alaska'
+        ) as file:
+
+            alaska_geojson = json.load(file)
+
+        geojson['features'].extend(
+            alaska_geojson['features']
+        )
     # --------------------------------------------------
     # CREATE RICHMOND GEOID FOR EACH GEOJSON FEATURE
     # --------------------------------------------------
