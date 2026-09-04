@@ -384,28 +384,19 @@ def district_map(data, year):
     )
 
     # --------------------------------------------------
-    # LOAD HISTORICAL GEOJSON
+    # LOAD HISTORICAL HOUSE GEOJSON
     # --------------------------------------------------
 
     with open(
-        f'data/geography/house/{year}.geojson',
-        encoding='utf-8'
+        f'data/geography/house/{year}.geojson'
     ) as file:
 
         geojson = json.load(file)
 
     # --------------------------------------------------
-    # CONSTRUCT GEOIDS FOR GEOJSON
+    # CREATE RICHMOND-STYLE GEOID
+    # FOR EACH GEOJSON DISTRICT
     # --------------------------------------------------
-
-    # The CSV uses identifiers such as:
-    #
-    # AL-01
-    # TX-07
-    # AK-01
-    #
-    # Lewis stores the state name and district number
-    # separately in the GeoJSON properties.
 
     state_abbreviations = {
 
@@ -462,13 +453,9 @@ def district_map(data, year):
         'District of Columbia': 'DC'
     }
 
-    # Add a geoid to every feature
     for feature in geojson['features']:
 
-        properties = feature.get(
-            'properties',
-            {}
-        )
+        properties = feature['properties']
 
         state_name = properties.get(
             'statename'
@@ -478,14 +465,12 @@ def district_map(data, year):
             'district'
         )
 
-        state_abbreviation = (
-            state_abbreviations.get(
-                state_name
-            )
+        state = state_abbreviations.get(
+            state_name
         )
 
         if (
-            state_abbreviation is not None
+            state is not None
             and district_number is not None
         ):
 
@@ -495,9 +480,8 @@ def district_map(data, year):
                     district_number
                 )
 
-                properties['geoid'] = (
-                    f'{state_abbreviation}-'
-                    f'{district_number:02d}'
+                properties['richmond_geoid'] = (
+                    f'{state}-{district_number:02d}'
                 )
 
             except (
@@ -505,22 +489,23 @@ def district_map(data, year):
                 TypeError
             ):
 
-                properties['geoid'] = None
+                properties['richmond_geoid'] = None
 
         else:
 
-            properties['geoid'] = None
+            properties['richmond_geoid'] = None
 
     # --------------------------------------------------
-    # FIND GEOIDS PRESENT IN GEOJSON
+    # CHECK MATCHING
     # --------------------------------------------------
 
     geojson_geoids = {
-        feature['properties'].get('geoid')
+        feature['properties'].get(
+            'richmond_geoid'
+        )
         for feature in geojson['features']
     }
 
-    # Keep only districts that exist in the geography
     winners = winners[
         winners['geoid'].isin(
             geojson_geoids
@@ -606,11 +591,14 @@ def district_map(data, year):
 
         fig.add_trace(
             go.Choropleth(
+
                 geojson=geojson,
 
                 locations=subset['geoid'],
 
-                featureidkey='properties.geoid',
+                featureidkey=(
+                    'properties.richmond_geoid'
+                ),
 
                 z=subset['percentage'],
 
@@ -624,7 +612,7 @@ def district_map(data, year):
                 marker_line_width=0.2,
                 marker_line_color='white',
 
-                name=party,
+                showlegend=False,
 
                 customdata=subset[
                     [
@@ -647,6 +635,36 @@ def district_map(data, year):
         )
 
     # --------------------------------------------------
+    # PARTY LEGEND
+    # --------------------------------------------------
+
+    legend_colours = {
+        'Republican': 'rgb(180,40,40)',
+        'Democratic': 'rgb(40,90,190)',
+        'American Independent': 'rgb(220,140,25)',
+        'Other': 'rgb(40,150,40)'
+    }
+
+    for party in parties:
+
+        fig.add_trace(
+            go.Scattergeo(
+                lon=[None],
+                lat=[None],
+                mode='markers',
+
+                marker=dict(
+                    size=10,
+                    color=legend_colours[party]
+                ),
+
+                name=party,
+                showlegend=True,
+                hoverinfo='skip'
+            )
+        )
+
+    # --------------------------------------------------
     # MAP SETTINGS
     # --------------------------------------------------
 
@@ -658,8 +676,8 @@ def district_map(data, year):
     fig.update_layout(
 
         title=(
-            f'House of Representatives '
-            f'election, {year}'
+            f'House of Representatives election, '
+            f'{year}'
         ),
 
         margin={
@@ -669,7 +687,12 @@ def district_map(data, year):
             'b': 0
         },
 
-        legend_title_text='Winning party'
+        legend=dict(
+            title='Winning party',
+            orientation='v',
+            x=0.01,
+            y=0.99
+        )
     )
 
     return fig
