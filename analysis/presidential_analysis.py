@@ -248,8 +248,6 @@ def county_map(data, year):
     # HISTORICAL COUNTY FALLBACKS
     # --------------------------------------------------
 
-    # These historical units need to be matched by their
-    # state and county name.
     historical_county_mapping = {
         ('GA', 'BARROW'): 'G1300130',
         ('KS', 'SEWARD'): 'G2001750',
@@ -271,7 +269,7 @@ def county_map(data, year):
     if year == 1972:
 
         with open(
-            'data/geography/alaska'
+            'data/geography/alaska/alaska_1972_missing_election_districts.geojson'
         ) as file:
 
             alaska_geojson = json.load(file)
@@ -279,6 +277,7 @@ def county_map(data, year):
         geojson['features'].extend(
             alaska_geojson['features']
         )
+
     # --------------------------------------------------
     # CREATE RICHMOND GEOID FOR EACH GEOJSON FEATURE
     # --------------------------------------------------

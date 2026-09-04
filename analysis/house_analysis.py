@@ -3,6 +3,7 @@ import json
 import plotly.graph_objects as go
 
 
+
 # ======================================================
 # MAIN PROGRAM
 # ======================================================
@@ -377,7 +378,6 @@ def district_map(data, year):
         data.groupby('geoid')['votes'].idxmax()
     ].copy()
 
-    # Make sure percentage is numeric
     winners['percentage'] = pd.to_numeric(
         winners['percentage'],
         errors='coerce'
@@ -394,8 +394,7 @@ def district_map(data, year):
         geojson = json.load(file)
 
     # --------------------------------------------------
-    # CREATE RICHMOND-STYLE GEOID
-    # FOR EACH GEOJSON DISTRICT
+    # STATE ABBREVIATIONS
     # --------------------------------------------------
 
     state_abbreviations = {
@@ -453,6 +452,10 @@ def district_map(data, year):
         'District of Columbia': 'DC'
     }
 
+    # --------------------------------------------------
+    # CREATE HOUSE GEOID FOR EACH GEOJSON FEATURE
+    # --------------------------------------------------
+
     for feature in geojson['features']:
 
         properties = feature['properties']
@@ -480,7 +483,7 @@ def district_map(data, year):
                     district_number
                 )
 
-                properties['richmond_geoid'] = (
+                properties['house_geoid'] = (
                     f'{state}-{district_number:02d}'
                 )
 
@@ -489,40 +492,106 @@ def district_map(data, year):
                 TypeError
             ):
 
-                properties['richmond_geoid'] = None
+                properties['house_geoid'] = None
 
         else:
 
-            properties['richmond_geoid'] = None
+            properties['house_geoid'] = None
 
     # --------------------------------------------------
-    # CHECK MATCHING
+    # AVAILABLE GEOIDS
     # --------------------------------------------------
 
     geojson_geoids = {
         feature['properties'].get(
-            'richmond_geoid'
+            'house_geoid'
         )
         for feature in geojson['features']
     }
 
-    winners = winners[
-        winners['geoid'].isin(
-            geojson_geoids
+    # --------------------------------------------------
+    # MATCH ELECTION GEOIDS TO GEOJSON
+    #
+    # Lewis uses XX-00 for an at-large seat.
+    # Election data uses XX-01.
+    # --------------------------------------------------
+
+    winners['map_geoid'] = winners['geoid']
+
+    for index, row in winners.iterrows():
+
+        election_geoid = row['geoid']
+
+        # Normal district
+        if election_geoid in geojson_geoids:
+            continue
+
+        # At-large district
+        state = str(
+            row['state']
+        ).strip().upper()
+
+        at_large_geoid = (
+            f'{state}-00'
         )
+
+        if at_large_geoid in geojson_geoids:
+
+            winners.at[
+                index,
+                'map_geoid'
+            ] = at_large_geoid
+
+        else:
+
+            winners.at[
+                index,
+                'map_geoid'
+            ] = None
+
+    # --------------------------------------------------
+    # CHECK FOR MISSING DISTRICTS
+    # --------------------------------------------------
+
+    missing_winners = winners[
+        winners['map_geoid'].isna()
+    ].copy()
+
+    print("\nMissing districts:")
+
+    if missing_winners.empty:
+
+        print("None")
+
+    else:
+
+        print(
+            missing_winners[
+                [
+                    'state',
+                    'district',
+                    'geoid',
+                    'party',
+                    'percentage'
+                ]
+            ].to_string(index=False)
+        )
+
+    winners = winners[
+        winners['map_geoid'].notna()
     ].copy()
 
     print(
-        '\nNumber of winning districts:',
+        "\nNumber of winning districts:",
         len(winners)
     )
 
     print(
-        'Unique GEOIDs:',
+        "Unique GEOIDs:",
         winners['geoid'].nunique()
     )
 
-    print('\nWinning parties:')
+    print("\nWinning parties:")
 
     print(
         winners['party'].value_counts()
@@ -568,6 +637,18 @@ def district_map(data, year):
     }
 
     # --------------------------------------------------
+    # PARTY LEGEND
+    # --------------------------------------------------
+
+    legend_colours = {
+
+        'Republican': 'rgb(180,40,40)',
+        'Democratic': 'rgb(40,90,190)',
+        'American Independent': 'rgb(220,140,25)',
+        'Other': 'rgb(40,150,40)'
+    }
+
+    # --------------------------------------------------
     # CREATE MAP
     # --------------------------------------------------
 
@@ -580,6 +661,12 @@ def district_map(data, year):
         'Other'
     ]
 
+    # --------------------------------------------------
+    # CREATE A SMALL GEOJSON FOR EACH PARTY
+    #
+    # This is the important memory fix.
+    # --------------------------------------------------
+
     for party in parties:
 
         subset = winners[
@@ -589,28 +676,60 @@ def district_map(data, year):
         if subset.empty:
             continue
 
+        party_geoids = set(
+            subset['map_geoid']
+        )
+
+        party_features = [
+            feature
+            for feature in geojson['features']
+            if feature['properties'].get(
+                'house_geoid'
+            ) in party_geoids
+        ]
+
+        party_geojson = {
+            'type': 'FeatureCollection',
+            'features': party_features
+        }
+
+        # --------------------------------------------------
+        # MAP THIS PARTY
+        # --------------------------------------------------
+
         fig.add_trace(
-            go.Choropleth(
+            go.Choroplethmap(
 
-                geojson=geojson,
+                geojson=party_geojson,
 
-                locations=subset['geoid'],
+                locations=subset[
+                    'map_geoid'
+                ],
 
                 featureidkey=(
-                    'properties.richmond_geoid'
+                    'properties.house_geoid'
                 ),
 
-                z=subset['percentage'],
+                z=subset[
+                    'percentage'
+                ],
 
                 zmin=0,
                 zmax=100,
 
-                colorscale=colour_scales[party],
+                colorscale=colour_scales[
+                    party
+                ],
 
                 showscale=False,
 
-                marker_line_width=0.2,
-                marker_line_color='white',
+                marker=dict(
+                    opacity=1,
+                    line=dict(
+                        width=0.5,
+                        color='white'
+                    )
+                ),
 
                 showlegend=False,
 
@@ -638,19 +757,14 @@ def district_map(data, year):
     # PARTY LEGEND
     # --------------------------------------------------
 
-    legend_colours = {
-        'Republican': 'rgb(180,40,40)',
-        'Democratic': 'rgb(40,90,190)',
-        'American Independent': 'rgb(220,140,25)',
-        'Other': 'rgb(40,150,40)'
-    }
-
     for party in parties:
 
         fig.add_trace(
-            go.Scattergeo(
+            go.Scattermap(
+
                 lon=[None],
                 lat=[None],
+
                 mode='markers',
 
                 marker=dict(
@@ -659,25 +773,136 @@ def district_map(data, year):
                 ),
 
                 name=party,
+
                 showlegend=True,
+
                 hoverinfo='skip'
             )
         )
 
     # --------------------------------------------------
-    # MAP SETTINGS
+    # VOTE-SHARE KEY
     # --------------------------------------------------
 
-    fig.update_geos(
-        visible=False,
-        projection_type='albers usa'
-    )
+    gradient_values = [
+        (0.00, '0%'),
+        (0.25, '25%'),
+        (0.50, '50%'),
+        (0.75, '75%'),
+        (1.00, '100%')
+    ]
+
+    key_y_positions = {
+        'Republican': 0.16,
+        'Democratic': 0.10,
+        'American Independent': 0.04,
+        'Other': -0.02
+    }
+
+    for party in parties:
+
+        y = key_y_positions[party]
+
+        fig.add_annotation(
+            x=0.78,
+            y=y + 0.018,
+            xref='paper',
+            yref='paper',
+            text=party,
+            showarrow=False,
+            font=dict(size=10)
+        )
+
+        scale = colour_scales[party]
+
+        for i in range(5):
+
+            if i == 0:
+                x0 = 0.86
+                x1 = 0.884
+
+            elif i == 1:
+                x0 = 0.884
+                x1 = 0.908
+
+            elif i == 2:
+                x0 = 0.908
+                x1 = 0.932
+
+            elif i == 3:
+                x0 = 0.932
+                x1 = 0.956
+
+            else:
+                x0 = 0.956
+                x1 = 0.980
+
+            fig.add_shape(
+
+                type='rect',
+
+                xref='paper',
+                yref='paper',
+
+                x0=x0,
+                x1=x1,
+
+                y0=y,
+                y1=y + 0.025,
+
+                fillcolor=scale[i][1],
+
+                line=dict(
+                    width=0
+                )
+            )
+
+        x_positions = [
+            0.86,
+            0.884,
+            0.908,
+            0.932,
+            0.956
+        ]
+
+        for i, (position, label) in enumerate(
+            gradient_values
+        ):
+
+            fig.add_annotation(
+
+                x=x_positions[i],
+
+                y=y - 0.018,
+
+                xref='paper',
+                yref='paper',
+
+                text=label,
+
+                showarrow=False,
+
+                font=dict(size=8)
+            )
+
+    # --------------------------------------------------
+    # MAP SETTINGS
+    # --------------------------------------------------
 
     fig.update_layout(
 
         title=(
             f'House of Representatives election, '
             f'{year}'
+        ),
+
+        map=dict(
+            style='white-bg',
+            center=dict(
+                lat=39,
+                lon=-96
+            ),
+            zoom=2.6
         ),
 
         margin={
@@ -696,7 +921,6 @@ def district_map(data, year):
     )
 
     return fig
-
 
 # ======================================================
 # RUN PROGRAM
