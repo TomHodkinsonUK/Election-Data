@@ -190,17 +190,17 @@
       "n": "DISTRICT 1",
       "a": "AZ",
       "j": "AZ-01",
-      "tv": 0,
+      "tv": 205239,
       "v": [
         {
           "p": "Democratic",
-          "v": 0,
-          "perc": 0
+          "v": 83676,
+          "perc": 0.4077002909
         },
         {
           "p": "Republican",
-          "v": 0,
-          "perc": 0
+          "v": 121563,
+          "perc": 0.5922997091
         }
       ]
     },
@@ -208,17 +208,17 @@
       "n": "DISTRICT 2",
       "a": "AZ",
       "j": "AZ-02",
-      "tv": 0,
+      "tv": 171323,
       "v": [
         {
           "p": "Democratic",
-          "v": 0,
-          "perc": 0
+          "v": 95512,
+          "perc": 0.5574966584
         },
         {
           "p": "Republican",
-          "v": 0,
-          "perc": 0
+          "v": 75811,
+          "perc": 0.4425033416
         }
       ]
     },
@@ -226,12 +226,12 @@
       "n": "DISTRICT 1",
       "a": "AR",
       "j": "AR-01",
-      "tv": 0,
+      "tv": -1,
       "v": [
         {
           "p": "Democratic",
-          "v": 0,
-          "perc": 0
+          "v": -1,
+          "perc": 100
         },
         {
           "p": "Republican",
@@ -244,12 +244,12 @@
       "n": "DISTRICT 2",
       "a": "AR",
       "j": "AR-02",
-      "tv": 0,
+      "tv": -1,
       "v": [
         {
           "p": "Democratic",
-          "v": 0,
-          "perc": 0
+          "v": -1,
+          "perc": 1
         },
         {
           "p": "Republican",
@@ -262,12 +262,12 @@
       "n": "DISTRICT 3",
       "a": "AR",
       "j": "AR-03",
-      "tv": 0,
+      "tv": -1,
       "v": [
         {
           "p": "Democratic",
-          "v": 0,
-          "perc": 0
+          "v": -1,
+          "perc": 1
         },
         {
           "p": "Republican",
@@ -280,12 +280,12 @@
       "n": "DISTRICT 4",
       "a": "AR",
       "j": "AR-04",
-      "tv": 0,
+      "tv": -1,
       "v": [
         {
           "p": "Democratic",
-          "v": 0,
-          "perc": 0
+          "v": -1,
+          "perc": 1
         },
         {
           "p": "Republican",
@@ -298,17 +298,17 @@
       "n": "DISTRICT 5",
       "a": "AR",
       "j": "AR-05",
-      "tv": 0,
+      "tv": 69671,
       "v": [
         {
           "p": "Democratic",
-          "v": 0,
-          "perc": 0
+          "v": 57617,
+          "perc": 0.8269868381
         },
         {
           "p": "Republican",
-          "v": 0,
-          "perc": 0
+          "v": 12054,
+          "perc": 0.1730131619
         }
       ]
     },
@@ -316,12 +316,12 @@
       "n": "DISTRICT 6",
       "a": "AR",
       "j": "AR-06",
-      "tv": 0,
+      "tv": -1,
       "v": [
         {
           "p": "Democratic",
-          "v": 0,
-          "perc": 0
+          "v": -1,
+          "perc": 1
         },
         {
           "p": "Republican",
@@ -334,17 +334,22 @@
       "n": "DISTRICT 1",
       "a": "CA",
       "j": "CA-01",
-      "tv": 0,
+      "tv": 224338,
       "v": [
         {
           "p": "Democratic",
-          "v": 0,
-          "perc": 0
+          "v": 115829,
+          "perc": 0.516314668
         },
         {
           "p": "Republican",
-          "v": 0,
-          "perc": 0
+          "v": 108505,
+          "perc": 0.4836675017
+        },
+        {
+          "p": "Other",
+          "v": 1,
+          "perc": 0.000004457559575 
         }
       ]
     },
@@ -5857,35 +5862,17 @@
       "n": "DISTRICT 1",
       "a": "ND",
       "j": "ND-01",
-      "tv": 0,
-      "v": [
-        {
-          "p": "Democratic",
-          "v": 0,
-          "perc": 0
-        },
-        {
-          "p": "Republican",
-          "v": 0,
-          "perc": 0
-        }
-      ]
-    },
-    {
-      "n": "DISTRICT 2",
-      "a": "ND",
-      "j": "ND-02",
-      "tv": 365559,
+      "tv": 492677,
       "v": [
         {
           "p": "Democratic",
           "v": 229980,
-          "perc": 0.6291186921946936
+          "perc": 0.4667967045
         },
         {
           "p": "Republican",
-          "v": 135579,
-          "perc": 0.37088130780530637
+          "v": 262697,
+          "perc": 0.5332032955
         }
       ]
     },
