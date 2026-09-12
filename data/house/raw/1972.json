@@ -8715,17 +8715,17 @@
       "n": "DISTRICT 2",
       "a": "WV",
       "j": "WV-02",
-      "tv": 182560,
+      "tv": 183235,
       "v": [
         {
           "p": "Democratic",
           "v": 128286,
-          "perc": 0.7027059596844873
+          "perc": 0.7001173357
         },
         {
           "p": "Republican",
-          "v": 54274,
-          "perc": 0.2972940403155127
+          "v": 54949,
+          "perc": 0.2998826643
         }
       ]
     },
@@ -8733,10 +8733,20 @@
       "n": "DISTRICT 3",
       "a": "WV",
       "j": "WV-03",
-      "tv": -1,
-      "v": [],
-      "votes_reported": false,
-      "note": "Raw file contains 0/0 placeholder; exact official 1972 district result requires verification."
+      "tv": 185787,
+      "v": [
+        {
+          "p": "Democratic",
+          "v": 118346,
+          "perc": 0.636998283
+        },
+        {
+          "p": "Republican",
+          "v": 67441,
+          "perc": 0.363001717
+        }
+      ]
+      
     },
     {
       "n": "DISTRICT 4",

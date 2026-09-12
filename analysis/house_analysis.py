@@ -499,7 +499,7 @@ def district_map(data, year):
             properties['house_geoid'] = None
 
     # --------------------------------------------------
-    # GEOIDS AVAILABLE IN THE GEOJSON
+    # GEOIDS AVAILABLE IN GEOJSON
     # --------------------------------------------------
 
     geojson_geoids = {
@@ -512,8 +512,12 @@ def district_map(data, year):
     # --------------------------------------------------
     # MATCH ELECTION GEOIDS TO HISTORICAL GEOJSON
     #
-    # Lewis uses XX-00 for at-large seats.
-    # Election data uses XX-01.
+    # Normal districts:
+    #     TX-05 -> TX-05
+    #
+    # At-large districts:
+    #     Election data uses XX-01
+    #     Lewis geography uses XX-00
     # --------------------------------------------------
 
     winners['map_geoid'] = winners['geoid']
@@ -661,62 +665,16 @@ def district_map(data, year):
     ]
 
     # --------------------------------------------------
-    # SEPARATE ALASKA AND HAWAII
+    # DRAW EACH PARTY SEPARATELY
     #
-    # They are handled separately so their unusual
-    # geographic geometry cannot affect the main
-    # Albers map.
-    # --------------------------------------------------
-
-    mainland_features = []
-
-    alaska_features = []
-
-    hawaii_features = []
-
-    for feature in geojson['features']:
-
-        state = feature['properties'].get(
-            'statename'
-        )
-
-        if state == 'Alaska':
-
-            alaska_features.append(feature)
-
-        elif state == 'Hawaii':
-
-            hawaii_features.append(feature)
-
-        else:
-
-            mainland_features.append(feature)
-
-    mainland_geojson = {
-        'type': 'FeatureCollection',
-        'features': mainland_features
-    }
-
-    # --------------------------------------------------
-    # CREATE PARTY MAPS FOR MAINLAND DISTRICTS
+    # Only winning districts are included in each
+    # GeoJSON. This keeps memory usage manageable.
     # --------------------------------------------------
 
     for party in parties:
 
         subset = winners[
-            (winners['party'] == party)
-            &
-            (
-                ~winners['map_geoid'].str.startswith(
-                    'AK-'
-                )
-            )
-            &
-            (
-                ~winners['map_geoid'].str.startswith(
-                    'HI-'
-                )
-            )
+            winners['party'] == party
         ].copy()
 
         if subset.empty:
@@ -730,7 +688,7 @@ def district_map(data, year):
 
             feature
 
-            for feature in mainland_features
+            for feature in geojson['features']
 
             if feature['properties'].get(
                 'house_geoid'
@@ -738,13 +696,16 @@ def district_map(data, year):
 
         ]
 
+        if not party_features:
+            continue
+
         party_geojson = {
             'type': 'FeatureCollection',
             'features': party_features
         }
 
         fig.add_trace(
-            go.Choropleth(
+            go.Choroplethmap(
 
                 geojson=party_geojson,
 
@@ -769,8 +730,10 @@ def district_map(data, year):
 
                 showscale=False,
 
-                marker_line_width=0.2,
+                marker_line_width=0.5,
                 marker_line_color='white',
+
+                name=party,
 
                 showlegend=False,
 
@@ -795,317 +758,13 @@ def district_map(data, year):
         )
 
     # --------------------------------------------------
-    # ALASKA / HAWAII INSET POLYGONS
-    # --------------------------------------------------
-    #
-    # These are drawn as Scattergeo polygons so that
-    # we can move and shrink them without affecting
-    # the mainland geography.
-    # --------------------------------------------------
-
-    def get_coordinates(
-        geometry
-    ):
-
-        geometry_type = geometry['type']
-        coordinates = geometry['coordinates']
-
-        if geometry_type == 'Polygon':
-
-            return [
-                ring
-                for ring in coordinates
-            ]
-
-        if geometry_type == 'MultiPolygon':
-
-            rings = []
-
-            for polygon in coordinates:
-
-                for ring in polygon:
-
-                    rings.append(ring)
-
-            return rings
-
-        return []
-
-    def transform_inset(
-        coordinates,
-        scale,
-        target_lon,
-        target_lat
-    ):
-
-        transformed = []
-
-        for ring in coordinates:
-
-            new_ring = []
-
-            for point in ring:
-
-                lon = point[0]
-                lat = point[1]
-
-                # Move Alaska/Hawaii relative to their
-                # own approximate centres.
-                new_lon = (
-                    target_lon
-                    + (
-                        lon + 150
-                    ) * scale
-                )
-
-                new_lat = (
-                    target_lat
-                    + (
-                        lat - 60
-                    ) * scale
-                )
-
-                new_ring.append(
-                    [
-                        new_lon,
-                        new_lat
-                    ]
-                )
-
-            transformed.append(
-                new_ring
-            )
-
-        return transformed
-
-    # --------------------------------------------------
-    # ALASKA WINNER
-    # --------------------------------------------------
-
-    alaska_winners = winners[
-        winners['map_geoid'].str.startswith(
-            'AK-'
-        )
-    ].copy()
-
-    # --------------------------------------------------
-    # HAWAII WINNERS
-    # --------------------------------------------------
-
-    hawaii_winners = winners[
-        winners['map_geoid'].str.startswith(
-            'HI-'
-        )
-    ].copy()
-
-    # --------------------------------------------------
-    # DRAW ALASKA INSET
-    # --------------------------------------------------
-
-    if not alaska_winners.empty:
-
-        alaska_lookup = {
-            feature['properties'].get(
-                'house_geoid'
-            ): feature
-            for feature in alaska_features
-        }
-
-        for _, row in alaska_winners.iterrows():
-
-            feature = alaska_lookup.get(
-                row['map_geoid']
-            )
-
-            if feature is None:
-                continue
-
-            # Small Alaska inset positioned in the
-            # bottom-left of the Albers USA map.
-            rings = get_coordinates(
-                feature['geometry']
-            )
-
-            transformed_rings = (
-                transform_inset(
-                    rings,
-                    0.28,
-                    -119,
-                    28
-                )
-            )
-
-            for ring in transformed_rings:
-
-                lons = [
-                    point[0]
-                    for point in ring
-                ]
-
-                lats = [
-                    point[1]
-                    for point in ring
-                ]
-
-                fig.add_trace(
-                    go.Scattergeo(
-
-                        lon=lons,
-                        lat=lats,
-
-                        mode='lines',
-
-                        fill='toself',
-
-                        fillcolor=(
-                            colour_scales[
-                                row['party']
-                            ][
-                                min(
-                                    int(
-                                        row[
-                                            'percentage'
-                                        ] / 25
-                                    ),
-                                    4
-                                )
-                            ][1]
-                        ),
-
-                        line=dict(
-                            color='white',
-                            width=0.5
-                        ),
-
-                        showlegend=False,
-
-                        hovertemplate=(
-                            '<b>'
-                            + str(row['district'])
-                            + '</b><br>'
-                            'State: '
-                            + str(row['state'])
-                            + '<br>'
-                            'Winner: '
-                            + str(row['party'])
-                            + '<br>'
-                            'Votes: '
-                            + f"{row['votes']:,}"
-                            + '<br>'
-                            'Vote share: '
-                            + f"{row['percentage']:.2f}%"
-                            + '<extra></extra>'
-                        )
-                    )
-                )
-
-    # --------------------------------------------------
-    # DRAW HAWAII INSET
-    # --------------------------------------------------
-
-    if not hawaii_winners.empty:
-
-        hawaii_lookup = {
-            feature['properties'].get(
-                'house_geoid'
-            ): feature
-            for feature in hawaii_features
-        }
-
-        for _, row in hawaii_winners.iterrows():
-
-            feature = hawaii_lookup.get(
-                row['map_geoid']
-            )
-
-            if feature is None:
-                continue
-
-            rings = get_coordinates(
-                feature['geometry']
-            )
-
-            transformed_rings = (
-                transform_inset(
-                    rings,
-                    0.65,
-                    -106,
-                    28
-                )
-            )
-
-            for ring in transformed_rings:
-
-                lons = [
-                    point[0]
-                    for point in ring
-                ]
-
-                lats = [
-                    point[1]
-                    for point in ring
-                ]
-
-                fig.add_trace(
-                    go.Scattergeo(
-
-                        lon=lons,
-                        lat=lats,
-
-                        mode='lines',
-
-                        fill='toself',
-
-                        fillcolor=(
-                            colour_scales[
-                                row['party']
-                            ][
-                                min(
-                                    int(
-                                        row[
-                                            'percentage'
-                                        ] / 25
-                                    ),
-                                    4
-                                )
-                            ][1]
-                        ),
-
-                        line=dict(
-                            color='white',
-                            width=0.5
-                        ),
-
-                        showlegend=False,
-
-                        hovertemplate=(
-                            '<b>'
-                            + str(row['district'])
-                            + '</b><br>'
-                            'State: '
-                            + str(row['state'])
-                            + '<br>'
-                            'Winner: '
-                            + str(row['party'])
-                            + '<br>'
-                            'Votes: '
-                            + f"{row['votes']:,}"
-                            + '<br>'
-                            'Vote share: '
-                            + f"{row['percentage']:.2f}%"
-                            + '<extra></extra>'
-                        )
-                    )
-                )
-
-    # --------------------------------------------------
     # PARTY LEGEND
     # --------------------------------------------------
 
     for party in parties:
 
         fig.add_trace(
-            go.Scattergeo(
+            go.Scattermap(
 
                 lon=[None],
                 lat=[None],
@@ -1138,10 +797,10 @@ def district_map(data, year):
     ]
 
     key_y_positions = {
-        'Republican': 0.16,
-        'Democratic': 0.10,
+        'Republican': 0.12,
+        'Democratic': 0.08,
         'American Independent': 0.04,
-        'Other': -0.02
+        'Other': 0.00
     }
 
     for party in parties:
@@ -1149,38 +808,21 @@ def district_map(data, year):
         y = key_y_positions[party]
 
         fig.add_annotation(
-            x=0.78,
-            y=y + 0.018,
+            x=0.72,
+            y=y + 0.012,
             xref='paper',
             yref='paper',
             text=party,
             showarrow=False,
-            font=dict(size=10)
+            font=dict(size=9)
         )
 
         scale = colour_scales[party]
 
         for i in range(5):
 
-            if i == 0:
-                x0 = 0.86
-                x1 = 0.884
-
-            elif i == 1:
-                x0 = 0.884
-                x1 = 0.908
-
-            elif i == 2:
-                x0 = 0.908
-                x1 = 0.932
-
-            elif i == 3:
-                x0 = 0.932
-                x1 = 0.956
-
-            else:
-                x0 = 0.956
-                x1 = 0.980
+            x0 = 0.80 + (i * 0.035)
+            x1 = 0.80 + ((i + 1) * 0.035)
 
             fig.add_shape(
 
@@ -1193,7 +835,7 @@ def district_map(data, year):
                 x1=x1,
 
                 y0=y,
-                y1=y + 0.025,
+                y1=y + 0.018,
 
                 fillcolor=scale[i][1],
 
@@ -1203,11 +845,11 @@ def district_map(data, year):
             )
 
         x_positions = [
-            0.86,
-            0.884,
-            0.908,
-            0.932,
-            0.956
+            0.80,
+            0.835,
+            0.87,
+            0.905,
+            0.94
         ]
 
         for i, (position, label) in enumerate(
@@ -1218,7 +860,7 @@ def district_map(data, year):
 
                 x=x_positions[i],
 
-                y=y - 0.018,
+                y=y - 0.014,
 
                 xref='paper',
                 yref='paper',
@@ -1227,23 +869,27 @@ def district_map(data, year):
 
                 showarrow=False,
 
-                font=dict(size=8)
+                font=dict(size=7)
             )
 
     # --------------------------------------------------
     # MAP SETTINGS
     # --------------------------------------------------
 
-    fig.update_geos(
-        visible=False,
-        projection_type='albers usa'
-    )
-
     fig.update_layout(
 
         title=(
             f'House of Representatives election, '
             f'{year}'
+        ),
+
+        map=dict(
+            style='white-bg',
+            center=dict(
+                lat=39,
+                lon=-96
+            ),
+            zoom=2.6
         ),
 
         margin={
