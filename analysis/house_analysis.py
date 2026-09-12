@@ -1093,7 +1093,7 @@ def district_map(data, year):
                             + '<br>'
                             'Vote share: '
                             + f"{row['percentage']:.2f}%"
-                            + '<extra></extra>"
+                            + '<extra></extra>'
                         )
                     )
                 )
