@@ -8,7 +8,6 @@ def main():
     choice = input(
         "Would you like to (1) create a CSV, "
         "(2) compare elections, or "
-        "(3) apply corrections? "
     )
 
     if choice == "1":
