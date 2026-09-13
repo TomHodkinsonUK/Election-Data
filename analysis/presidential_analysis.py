@@ -59,13 +59,19 @@ def main():
       state,
       county, 
     )
+    fig = plot_county_trajectory(
+            result,
+            state,
+            county
+    )
 
-    print(result[['party',
-                  'percentage_1960',
-                  'percentage_1964',
-                  'percentage_1968',
-                  'percentage_1972']].to_string(index=False))
-
+    fig.write_html(
+        f'graphs/presidential/trajectory_{state}_{county}.html'
+    )
+    print(
+        f'Graph saved to '
+        f'graphs/presidential/trajectory_{state}_{county}.html'
+    )
   elif choice == '4':
     year = int(input('Election Year: '))
     data = elections[year]
@@ -182,6 +188,169 @@ def county_trajectory(elections, state, county):
   })
   
   return merged 
+
+def plot_county_trajectory(
+    result,
+    state,
+    county
+):
+
+    years = [
+        1960,
+        1964,
+        1968,
+        1972
+    ]
+
+    fig = go.Figure()
+
+    republican = result[
+        result['party'] == 'Republican'
+    ]
+
+    democratic = result[
+        result['party'] == 'Democratic'
+    ]
+
+    american_independent = result[
+        result['party'] == 'American Independent'
+    ]
+
+    other = result[
+        result['party'] == 'Other'
+    ]
+    if not republican.empty:
+
+        fig.add_trace(
+            go.Scatter(
+                x=years,
+                y=[
+                    republican[
+                        f'percentage_{year}'
+                    ].iloc[0]
+                    if f'percentage_{year}' in republican.columns
+                    else None
+                    for year in years
+                ],
+                mode='lines+markers',
+                name='Republican',
+                line=dict(color='red'),
+                hovertemplate=(
+                    'Year: %{x}<br>'
+                    'Vote share: %{y:.2f}%'
+                    '<extra>Republican</extra>'
+                )
+            )
+        )
+
+    if not democratic.empty:
+
+        fig.add_trace(
+            go.Scatter(
+                x=years,
+                y=[
+                    democratic[
+                        f'percentage_{year}'
+                    ].iloc[0]
+                    if f'percentage_{year}' in democratic.columns
+                    else None
+                    for year in years
+                ],
+                mode='lines+markers',
+                name='Democratic',
+                line=dict(color='blue'),
+                hovertemplate=(
+                    'Year: %{x}<br>'
+                    'Vote share: %{y:.2f}%'
+                    '<extra>Democratic</extra>'
+                )
+            )
+        )
+    if not american_independent.empty:
+
+        fig.add_trace(
+            go.Scatter(
+
+                x=years,
+
+                y=[
+                    american_independent[
+                        f'percentage_{year}'
+                    ].iloc[0]
+                    if f'percentage_{year}' in american_independent.columns
+                    else None
+                    for year in years
+                ],
+
+                mode='lines+markers',
+
+                name='American Independent',
+
+                line=dict(
+                    color='orange'
+                ),
+
+                hovertemplate=(
+                    'Year: %{x}<br>'
+                    'Vote share: %{y:.2f}%'
+                    '<extra>American Independent</extra>'
+                )
+            )
+        )
+
+    if not other.empty:
+
+        fig.add_trace(
+            go.Scatter(
+
+                x=years,
+
+                y=[
+                    other[
+                        f'percentage_{year}'
+                    ].iloc[0]
+                    if f'percentage_{year}' in other.columns
+                    else None
+                    for year in years
+                ],
+
+                mode='lines+markers',
+
+                name='Other',
+
+                line=dict(
+                    color='green'
+                ),
+
+                hovertemplate=(
+                    'Year: %{x}<br>'
+                    'Vote share: %{y:.2f}%'
+                    '<extra>Other</extra>'
+                )
+            )
+        )
+    fig.update_layout(
+
+        title=(
+            f'Presidential electoral trajectory: '
+            f'{county}, {state}'
+        ),
+
+        xaxis=dict(
+            title='Election year',
+            tickmode='array',
+            tickvals=years
+        ),
+
+        yaxis=dict(
+            title='Vote share (%)',
+            range=[0, 100]
+        ),
+
+        hovermode='x unified'
+    )
+
+    return fig
 
 def county_map(data, year):
 

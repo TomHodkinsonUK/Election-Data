@@ -106,22 +106,19 @@ def main():
             state,
             district
         )
-
-        print(
-            result[
-                [
-                    'party',
-                    'percentage_1960',
-                    'percentage_1962',
-                    'percentage_1964',
-                    'percentage_1966',
-                    'percentage_1968',
-                    'percentage_1970',
-                    'percentage_1972'
-                ]
-            ].to_string(index=False)
+        fig = plot_district_trajectory(
+            result,
+            district
         )
 
+        fig.write_html(
+            f"graphs/house/trajectory_{district}.html"
+        )
+
+        print(
+            f"Graph saved to graphs/house/trajectory_{district}.html"
+        )
+        
     # --------------------------------------------------
     # DISTRICT MAP
     # --------------------------------------------------
@@ -368,6 +365,104 @@ def district_trajectory(
 
     return merged
 
+#
+# DISTRICT ELECTORAL TRAJECTORY GRAPH
+#
+
+def plot_district_trajectory(
+    result,
+    district
+):
+
+    years = [
+        1960,
+        1962,
+        1964,
+        1966,
+        1968,
+        1970,
+        1972
+    ]
+
+    fig = go.Figure()
+
+    republican = result[
+        result['party'] == 'Republican'
+    ]
+
+    democratic = result[
+        result['party'] == 'Democratic'
+    ]
+
+    if not republican.empty:
+
+        fig.add_trace(
+            go.Scatter(
+                x=years,
+                y=[
+                    republican[
+                        f'percentage_{year}'
+                    ].iloc[0]
+                    if f'percentage_{year}' in republican.columns
+                    else None
+                    for year in years
+                ],
+                mode='lines+markers',
+                name='Republican',
+                line=dict(color='red'),
+                hovertemplate=(
+                    'Year: %{x}<br>'
+                    'Vote share: %{y:.2f}%'
+                    '<extra>Republican</extra>'
+                )
+            )
+        )
+
+    if not democratic.empty:
+
+        fig.add_trace(
+            go.Scatter(
+                x=years,
+                y=[
+                    democratic[
+                        f'percentage_{year}'
+                    ].iloc[0]
+                    if f'percentage_{year}' in democratic.columns
+                    else None
+                    for year in years
+                ],
+                mode='lines+markers',
+                name='Democratic',
+                line=dict(color='blue'),
+                hovertemplate=(
+                    'Year: %{x}<br>'
+                    'Vote share: %{y:.2f}%'
+                    '<extra>Democratic</extra>'
+                )
+            )
+        )
+
+    fig.update_layout(
+
+        title=(
+            f'Electoral trajectory: {district}'
+        ),
+
+        xaxis=dict(
+            title='Election year',
+            tickmode='array',
+            tickvals=years
+        ),
+
+        yaxis=dict(
+            title='Vote share (%)',
+            range=[0, 100]
+        ),
+
+        hovermode='x unified'
+    )
+
+    return fig
 # ======================================================
 # DISTRICT MAP
 # ======================================================
