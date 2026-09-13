@@ -526,7 +526,6 @@ def district_map(data, year):
 
         election_geoid = row['geoid']
 
-        # Normal district
         if election_geoid in geojson_geoids:
             continue
 
@@ -665,16 +664,110 @@ def district_map(data, year):
     ]
 
     # --------------------------------------------------
-    # DRAW EACH PARTY SEPARATELY
-    #
-    # Only winning districts are included in each
-    # GeoJSON. This keeps memory usage manageable.
+    # TRANSFORM GEOMETRY FOR INSETS
+    # --------------------------------------------------
+
+    def transform_geometry(
+        geometry,
+        scale,
+        target_lon,
+        target_lat,
+        source_lon,
+        source_lat
+    ):
+
+        geometry = json.loads(
+            json.dumps(geometry)
+        )
+
+        def transform_coordinates(
+            coordinates
+        ):
+
+            # A single coordinate:
+            # [longitude, latitude]
+            if (
+                isinstance(coordinates, list)
+                and len(coordinates) >= 2
+                and isinstance(
+                    coordinates[0],
+                    (int, float)
+                )
+                and isinstance(
+                    coordinates[1],
+                    (int, float)
+                )
+            ):
+
+                lon = coordinates[0]
+                lat = coordinates[1]
+
+                # Normalise longitude around
+                # the source centre. This prevents
+                # Alaska's date-line geometry from
+                # stretching across the map.
+                while (
+                    lon - source_lon > 180
+                ):
+
+                    lon -= 360
+
+                while (
+                    lon - source_lon < -180
+                ):
+
+                    lon += 360
+
+                new_lon = (
+                    target_lon
+                    + (
+                        lon - source_lon
+                    ) * scale
+                )
+
+                new_lat = (
+                    target_lat
+                    + (
+                        lat - source_lat
+                    ) * scale
+                )
+
+                return [
+                    new_lon,
+                    new_lat
+                ]
+
+            return [
+                transform_coordinates(
+                    item
+                )
+                for item in coordinates
+            ]
+
+        geometry['coordinates'] = (
+            transform_coordinates(
+                geometry['coordinates']
+            )
+        )
+
+        return geometry
+
+    # --------------------------------------------------
+    # DRAW MAINLAND DISTRICTS
     # --------------------------------------------------
 
     for party in parties:
 
         subset = winners[
-            winners['party'] == party
+            (winners['party'] == party)
+            &
+            (~winners['map_geoid'].str.startswith(
+                'AK-'
+            ))
+            &
+            (~winners['map_geoid'].str.startswith(
+                'HI-'
+            ))
         ].copy()
 
         if subset.empty:
@@ -734,6 +827,284 @@ def district_map(data, year):
                 marker_line_color='white',
 
                 name=party,
+
+                showlegend=False,
+
+                customdata=subset[
+                    [
+                        'district',
+                        'state',
+                        'party',
+                        'votes'
+                    ]
+                ],
+
+                hovertemplate=(
+                    '<b>%{customdata[0]}</b><br>'
+                    'State: %{customdata[1]}<br>'
+                    'Winner: %{customdata[2]}<br>'
+                    'Votes: %{customdata[3]:,}<br>'
+                    'Vote share: %{z:.2f}%'
+                    '<extra></extra>'
+                )
+            )
+        )
+
+    # --------------------------------------------------
+    # DRAW ALASKA INSET
+    # --------------------------------------------------
+
+    alaska_winners = winners[
+        winners['map_geoid'].str.startswith(
+            'AK-'
+        )
+    ].copy()
+
+    alaska_lookup = {
+
+        feature['properties'].get(
+            'house_geoid'
+        ): feature
+
+        for feature in geojson['features']
+
+        if feature['properties'].get(
+            'statename'
+        ) == 'Alaska'
+
+    }
+
+    alaska_features_by_party = {}
+
+    for _, row in alaska_winners.iterrows():
+
+        feature = alaska_lookup.get(
+            row['map_geoid']
+        )
+
+        if feature is None:
+            continue
+
+        transformed_geometry = (
+            transform_geometry(
+                feature['geometry'],
+                0.28,
+                -118,
+                25,
+                -150,
+                62
+            )
+        )
+
+        transformed_feature = {
+            'type': 'Feature',
+            'properties': {
+                'house_geoid': row['map_geoid']
+            },
+            'geometry': transformed_geometry
+        }
+
+        party = row['party']
+
+        if party not in alaska_features_by_party:
+
+            alaska_features_by_party[party] = []
+
+        alaska_features_by_party[
+            party
+        ].append(
+            transformed_feature
+        )
+
+    for party in parties:
+
+        subset = alaska_winners[
+            alaska_winners['party'] == party
+        ].copy()
+
+        if subset.empty:
+            continue
+
+        features = alaska_features_by_party.get(
+            party,
+            []
+        )
+
+        if not features:
+            continue
+
+        inset_geojson = {
+            'type': 'FeatureCollection',
+            'features': features
+        }
+
+        fig.add_trace(
+            go.Choroplethmap(
+
+                geojson=inset_geojson,
+
+                locations=subset[
+                    'map_geoid'
+                ],
+
+                featureidkey=(
+                    'properties.house_geoid'
+                ),
+
+                z=subset[
+                    'percentage'
+                ],
+
+                zmin=0,
+                zmax=100,
+
+                colorscale=colour_scales[
+                    party
+                ],
+
+                showscale=False,
+
+                marker_line_width=0.5,
+                marker_line_color='white',
+
+                showlegend=False,
+
+                customdata=subset[
+                    [
+                        'district',
+                        'state',
+                        'party',
+                        'votes'
+                    ]
+                ],
+
+                hovertemplate=(
+                    '<b>%{customdata[0]}</b><br>'
+                    'State: %{customdata[1]}<br>'
+                    'Winner: %{customdata[2]}<br>'
+                    'Votes: %{customdata[3]:,}<br>'
+                    'Vote share: %{z:.2f}%'
+                    '<extra></extra>'
+                )
+            )
+        )
+
+    # --------------------------------------------------
+    # DRAW HAWAII INSET
+    # --------------------------------------------------
+
+    hawaii_winners = winners[
+        winners['map_geoid'].str.startswith(
+            'HI-'
+        )
+    ].copy()
+
+    hawaii_lookup = {
+
+        feature['properties'].get(
+            'house_geoid'
+        ): feature
+
+        for feature in geojson['features']
+
+        if feature['properties'].get(
+            'statename'
+        ) == 'Hawaii'
+
+    }
+
+    hawaii_features_by_party = {}
+
+    for _, row in hawaii_winners.iterrows():
+
+        feature = hawaii_lookup.get(
+            row['map_geoid']
+        )
+
+        if feature is None:
+            continue
+
+        transformed_geometry = (
+            transform_geometry(
+                feature['geometry'],
+                0.75,
+                -103,
+                25,
+                -157,
+                21
+            )
+        )
+
+        transformed_feature = {
+            'type': 'Feature',
+            'properties': {
+                'house_geoid': row['map_geoid']
+            },
+            'geometry': transformed_geometry
+        }
+
+        party = row['party']
+
+        if party not in hawaii_features_by_party:
+
+            hawaii_features_by_party[party] = []
+
+        hawaii_features_by_party[
+            party
+        ].append(
+            transformed_feature
+        )
+
+    for party in parties:
+
+        subset = hawaii_winners[
+            hawaii_winners['party'] == party
+        ].copy()
+
+        if subset.empty:
+            continue
+
+        features = hawaii_features_by_party.get(
+            party,
+            []
+        )
+
+        if not features:
+            continue
+
+        inset_geojson = {
+            'type': 'FeatureCollection',
+            'features': features
+        }
+
+        fig.add_trace(
+            go.Choroplethmap(
+
+                geojson=inset_geojson,
+
+                locations=subset[
+                    'map_geoid'
+                ],
+
+                featureidkey=(
+                    'properties.house_geoid'
+                ),
+
+                z=subset[
+                    'percentage'
+                ],
+
+                zmin=0,
+                zmax=100,
+
+                colorscale=colour_scales[
+                    party
+                ],
+
+                showscale=False,
+
+                marker_line_width=0.5,
+                marker_line_color='white',
 
                 showlegend=False,
 
@@ -821,8 +1192,13 @@ def district_map(data, year):
 
         for i in range(5):
 
-            x0 = 0.80 + (i * 0.035)
-            x1 = 0.80 + ((i + 1) * 0.035)
+            x0 = 0.80 + (
+                i * 0.035
+            )
+
+            x1 = 0.80 + (
+                (i + 1) * 0.035
+            )
 
             fig.add_shape(
 
@@ -852,7 +1228,10 @@ def district_map(data, year):
             0.94
         ]
 
-        for i, (position, label) in enumerate(
+        for i, (
+            position,
+            label
+        ) in enumerate(
             gradient_values
         ):
 
