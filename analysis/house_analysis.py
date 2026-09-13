@@ -126,16 +126,22 @@ def main():
     # DISTRICT MAP
     # --------------------------------------------------
 
-    elif choice == '4':
+    elif choice == "4":
 
-        year = int(input('Election Year: '))
+        year = int(input("Election Year: "))
 
-        fig = district_map(
+        result = district_map(
             elections[year],
             year
         )
 
-        fig.show()
+        result.write_html(
+            f"maps/house/{year}.html"
+        )
+
+        print(
+            f"Map saved to maps/house/{year}.html"
+        )
 
     else:
 
@@ -776,7 +782,7 @@ def district_map(data, year):
         party_geoids = set(
             subset['map_geoid']
         )
-
+       
         party_features = [
 
             feature
@@ -786,7 +792,8 @@ def district_map(data, year):
             if feature['properties'].get(
                 'house_geoid'
             ) in party_geoids
-
+            
+        
         ]
 
         if not party_features:
@@ -796,7 +803,7 @@ def district_map(data, year):
             'type': 'FeatureCollection',
             'features': party_features
         }
-
+        
         fig.add_trace(
             go.Choroplethmap(
 
